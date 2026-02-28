@@ -8,7 +8,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "URL-এ ms এবং ps দেওয়া বাধ্যতামূলক।" });
     }
 
-    const targetUrl = 'https://api.ex.app/api/v2/user/login-msisdn';
+    const targetUrl = 'https://api.ostad.app/api/v2/user/login-msisdn';
 
     // আপনার অ্যাপের হেডার (যেখানে আপনার ZTE ডিভাইসের মেটাডাটা রয়েছে)
     const headers = {
