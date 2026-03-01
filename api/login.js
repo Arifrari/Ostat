@@ -9,7 +9,6 @@ export default async function handler(req, res) {
     return res.status(400).send("<h2 style='color:red; text-align:center;'>ms এবং ps দেওয়া বাধ্যতামূলক!</h2>");
   }
 
-  // আপনার দেওয়া অরিজিনাল হেডারগুলো (সব রিকোয়েস্টে এটাই ব্যবহার হবে)
   const headersTemplate = {
     "User-Agent": "Dart/3.9 (dart:io)",
     "Connection": "keep-alive",
@@ -24,7 +23,7 @@ export default async function handler(req, res) {
   };
 
   try {
-    // --- প্রথম রিকোয়েস্ট (লগিন করে টোকেন আনা) ---
+    // --- ১. লগিন করে টোকেন আনা ---
     const loginUrl = 'https://api.ostad.app/api/v2/user/login-msisdn'; 
     const loginRes = await fetch(loginUrl, {
       method: 'POST',
@@ -35,76 +34,116 @@ export default async function handler(req, res) {
     const loginData = await loginRes.json();
     const token = loginData?.data?.accessToken; 
 
-    // লগিন ফেইল হলে বা টোকেন না পেলে
     if (!token) {
       return res.status(401).send(`
-        <div style="font-family: sans-serif; text-align: center; padding: 50px; background: #ffebee;">
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
             <h2 style="color: red;">লগিন ব্যর্থ! ❌</h2>
             <p>আপনার দেওয়া নাম্বার বা পাসওয়ার্ড ভুল হতে পারে।</p>
         </div>
       `);
     }
 
-    // --- দ্বিতীয় রিকোয়েস্ট (টোকেন দিয়ে ব্যাচ ডাটা আনা) ---
+    // --- ২. টোকেন দিয়ে ব্যাচ ডাটা আনা ---
     const secondUrl = 'https://api.ostad.app/api/v2/batch?count=12&page=1&is_on_demand=false';
     const secondRes = await fetch(secondUrl, {
       method: 'GET',
       headers: {
         ...headersTemplate,
-        "accesstoken": token // আপনার দেওয়া ফরম্যাট অনুযায়ী সরাসরি টোকেন বসানো হলো
+        "accesstoken": token 
       }
     });
     
     const secondApiData = await secondRes.json();
 
-    // --- ব্রাউজারে সুন্দর করে রেসপন্স দেখানো ---
+    // --- ৩. JSON থেকে নির্দিষ্ট ডাটা বের করা (Data Parsing) ---
+    // টোটাল কোর্সের সংখ্যা বের করছি
+    const totalCourses = secondApiData?.data?.total || 0;
+    
+    // কোর্সের লিস্ট বের করছি
+    const courseResults = secondApiData?.data?.results || [];
+    
+    // লুপ চালিয়ে HTML এর জন্য একটি লিস্ট (<li>) তৈরি করছি
+    let courseListHTML = '';
+    courseResults.forEach((course) => {
+      const title = course?.course_snapshot?.title || "Unknown Course";
+      courseListHTML += `<li class="course-item">${title}</li>`;
+    });
+
+
+    // --- ৪. ব্রাউজারে সুন্দর করে রেসপন্স দেখানো ---
     const htmlResponse = `
       <!DOCTYPE html>
       <html lang="en">
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Batch API Result</title>
+          <title>My Courses</title>
           <style>
               body {
-                  font-family: 'Courier New', Courier, monospace;
-                  background-color: #1e1e1e;
-                  color: #d4d4d4;
+                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                  background-color: #f0f2f5;
+                  color: #333;
                   display: flex;
                   justify-content: center;
                   align-items: center;
                   min-height: 100vh;
                   margin: 0;
                   padding: 20px;
-                  box-sizing: border-box;
               }
               .container {
-                  background: #252526;
-                  padding: 20px;
-                  border-radius: 8px;
-                  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                  background: white;
+                  padding: 30px;
+                  border-radius: 12px;
+                  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
                   width: 100%;
-                  max-width: 800px;
-                  overflow-x: auto;
+                  max-width: 500px;
               }
               .header {
-                  color: #4CAF50;
+                  color: #1a73e8;
                   margin-top: 0;
-                  border-bottom: 1px solid #333;
+                  border-bottom: 2px solid #e8eaed;
                   padding-bottom: 10px;
-                  font-family: sans-serif;
+                  text-align: center;
               }
-              pre {
-                  font-size: 14px;
-                  line-height: 1.5;
-                  color: #9CDCFE;
+              .total-box {
+                  background: #e8f0fe;
+                  color: #1967d2;
+                  padding: 10px 15px;
+                  border-radius: 8px;
+                  font-weight: bold;
+                  font-size: 18px;
+                  margin-bottom: 20px;
+                  display: inline-block;
+              }
+              ol.course-list {
+                  padding-left: 20px;
+                  margin: 0;
+              }
+              li.course-item {
+                  background: #f8f9fa;
+                  margin-bottom: 10px;
+                  padding: 12px 15px;
+                  border-radius: 6px;
+                  border-left: 4px solid #1a73e8;
+                  font-size: 16px;
+                  font-weight: 500;
+                  transition: transform 0.2s;
+              }
+              li.course-item:hover {
+                  transform: translateX(5px);
+                  background: #e1ebf9;
               }
           </style>
       </head>
       <body>
           <div class="container">
-              <h3 class="header">✅ Batch Data Fetched Successfully!</h3>
-              <pre>${JSON.stringify(secondApiData, null, 4)}</pre>
+              <h2 class="header">📚 আপনার কোর্সসমূহ</h2>
+              
+              <div class="total-box">Total Courses: ${totalCourses}</div>
+              
+              <ol class="course-list">
+                  ${courseListHTML}
+              </ol>
           </div>
       </body>
       </html>
@@ -116,4 +155,4 @@ export default async function handler(req, res) {
   } catch (error) {
     res.status(500).send(`<h2 style='color:red; text-align:center;'>সার্ভার এরর: ${error.message}</h2>`);
   }
-                }
+}
