@@ -1,50 +1,115 @@
 export default async function handler(req, res) {
-  if (req.method === 'GET') {
-    
-    // ব্রাউজারের URL থেকে সংক্ষিপ্ত ms এবং ps সংগ্রহ করা
-    const { ms, ps } = req.query;
-
-    if (!ms || !ps) {
-      return res.status(400).json({ error: "URL-এ ms এবং ps দেওয়া বাধ্যতামূলক।" });
-    }
-
-    const targetUrl = 'https://api.ostad.app/api/v2/user/login-msisdn';
-
-    // আপনার অ্যাপের হেডার (যেখানে আপনার ZTE ডিভাইসের মেটাডাটা রয়েছে)
-    const headers = {
-      'x-ostad-app-build': '907',
-      'user-agent': 'Dart/3.9 (dart:io)',
-      'accesstoken': '',
-      'x-ostad-app-version': '2.103.2',
-      'fingerprint': '611f20c8-54a4-422a-b31e-6e18f84a6abf',
-      'x-ostad-app': 'com.ex.android',
-      'content-type': 'application/json',
-      'metadata': '{"model":"P963F95_A","brand":"ZTE","version":"34","display":"14.11_Z2453_SA","deviceType":"android"}',
-      'x-ostad-device-id': 'UP1A.231005.007'
-    };
-
-    // মূল API-কে তাদের পরিচিত msisdn এবং password নামেই ডাটা পাঠানো হচ্ছে
-    const body = JSON.stringify({
-      msisdn: ms,
-      password: ps
-    });
-
-    try {
-      const response = await fetch(targetUrl, {
-        method: 'POST',
-        headers: headers,
-        body: body
-      });
-
-      const data = await response.json();
-      res.status(response.status).json(data);
-
-    } catch (error) {
-      res.status(500).json({ error: "API থেকে ডাটা আনতে সমস্যা হয়েছে", details: error.message });
-    }
-    
-  } else {
-    res.setHeader('Allow', ['GET']);
-    res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: "Only GET method allowed" });
   }
-                                  }
+
+  const { ms, ps } = req.query;
+
+  if (!ms || !ps) {
+    return res.status(400).send("<h2 style='color:red; text-align:center;'>ms এবং ps দেওয়া বাধ্যতামূলক!</h2>");
+  }
+
+  // --- প্রথম রিকোয়েস্ট (লগিন) ---
+  const loginUrl = 'https://api.ostad.app/api/v2/user/login-msisdn'; 
+  const defaultHeaders = {
+    'x-ostad-app-build': '907',
+    'user-agent': 'Dart/3.9 (dart:io)',
+    'x-ostad-app-version': '2.103.2',
+    'x-ostad-app': 'com.ex.android',
+    'content-type': 'application/json',
+    'metadata': '{"model":"P963F95_A","brand":"ZTE","version":"34","display":"14.11_Z2453_SA","deviceType":"android"}',
+    'x-ostad-device-id': 'UP1A.231005.007'
+  };
+
+  try {
+    const loginRes = await fetch(loginUrl, {
+      method: 'POST',
+      headers: defaultHeaders,
+      body: JSON.stringify({ msisdn: ms, password: ps })
+    });
+    
+    const loginData = await loginRes.json();
+    const token = loginData?.data?.accessToken; 
+
+    if (!token) {
+      return res.status(401).send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+            <h2 style="color: red;">লগিন ব্যর্থ!</h2>
+            <p>সঠিক নাম্বার বা পাসওয়ার্ড দিন।</p>
+        </div>
+      `);
+    }
+
+    // --- দ্বিতীয় রিকোয়েস্ট (আপনার দেওয়া ব্যাচ API) ---
+    const secondUrl = 'https://api.ostad.app/api/v2/batch?count=12&page=1&is_on_demand=false';
+    
+    const secondRes = await fetch(secondUrl, {
+      method: 'GET',
+      headers: {
+        ...defaultHeaders,
+        'accesstoken': token // প্রথম রিকোয়েস্ট থেকে পাওয়া টোকেন এখানে পাঠানো হচ্ছে
+      }
+    });
+    
+    const secondApiData = await secondRes.json();
+
+    // --- ব্রাউজারে শুধুমাত্র ব্যাচের রেসপন্স দেখানো ---
+    const htmlResponse = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Batch API Result</title>
+          <style>
+              body {
+                  font-family: 'Courier New', Courier, monospace;
+                  background-color: #1e1e1e;
+                  color: #d4d4d4;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  min-height: 100vh;
+                  margin: 0;
+                  padding: 20px;
+                  box-sizing: border-box;
+              }
+              .container {
+                  background: #252526;
+                  padding: 20px;
+                  border-radius: 8px;
+                  box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                  width: 100%;
+                  max-width: 800px;
+                  overflow-x: auto;
+              }
+              .header {
+                  color: #4CAF50;
+                  margin-top: 0;
+                  border-bottom: 1px solid #333;
+                  padding-bottom: 10px;
+                  font-family: sans-serif;
+              }
+              pre {
+                  font-size: 14px;
+                  line-height: 1.5;
+                  color: #9CDCFE;
+              }
+          </style>
+      </head>
+      <body>
+          <div class="container">
+              <h3 class="header">Batch Data (Success!)</h3>
+              <pre>${JSON.stringify(secondApiData, null, 4)}</pre>
+          </div>
+      </body>
+      </html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.status(200).send(htmlResponse);
+
+  } catch (error) {
+    res.status(500).send(`<h2 style='color:red; text-align:center;'>সার্ভার এরর: ${error.message}</h2>`);
+  }
+}
