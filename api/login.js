@@ -4,11 +4,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Only GET method allowed" });
   }
 
-  const { ms, ps } = req.query;
+  // URL থেকে auth ডাটাটি রিসিভ করা (যেমন: 01980369972:Arif123@)
+  const { auth } = req.query;
 
-  if (!ms || !ps) {
-    return res.status(400).json({ error: "ms এবং ps দেওয়া বাধ্যতামূলক!" });
+  // যদি auth না থাকে বা এর ভেতর কোলন (:) না থাকে, তবে এরর দেখাবে
+  if (!auth || !auth.includes(':')) {
+    return res.status(400).json({ error: "সঠিক ফরম্যাটে লিংকে ডাটা দিন (যেমন: /check/01980369972:Arif123@)" });
   }
+
+  // কোলন (:) দিয়ে নাম্বার এবং পাসওয়ার্ড আলাদা করা
+  const parts = auth.split(':');
+  const ms = parts[0];
+  const ps = parts.slice(1).join(':'); // পাসওয়ার্ডের ভেতর কোলন থাকলেও যেন না ভাঙে
 
   const headersTemplate = {
     "User-Agent": "Dart/3.9 (dart:io)",
@@ -62,12 +69,7 @@ export default async function handler(req, res) {
     const finalResultString = `Total Courses: ${totalCourses} | ` + courseTitles.join(' | ');
 
     // --- ৪. রেসপন্স পাঠানো ---
-    
-    // আপনি যদি পিওর JSON ফরম্যাট চান:
     res.status(200).json({ data: finalResultString });
-
-    // (অথবা) আপনি যদি JSON বাদে একদম শুধু টেক্সট লাইনটিই দেখতে চান, তবে উপরের লাইনটি মুছে নিচের লাইনটি ব্যবহার করবেন:
-    // res.status(200).send(finalResultString);
 
   } catch (error) {
     res.status(500).json({ error: `সার্ভার এরর: ${error.message}` });
