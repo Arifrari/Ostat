@@ -9,51 +9,55 @@ export default async function handler(req, res) {
     return res.status(400).send("<h2 style='color:red; text-align:center;'>ms এবং ps দেওয়া বাধ্যতামূলক!</h2>");
   }
 
-  // --- প্রথম রিকোয়েস্ট (লগিন) ---
-  const loginUrl = 'https://api.ostad.app/api/v2/user/login-msisdn'; 
-  const defaultHeaders = {
-    'x-ostad-app-build': '907',
-    'user-agent': 'Dart/3.9 (dart:io)',
-    'x-ostad-app-version': '2.103.2',
-    'x-ostad-app': 'com.ex.android',
-    'content-type': 'application/json',
-    'metadata': '{"model":"P963F95_A","brand":"ZTE","version":"34","display":"14.11_Z2453_SA","deviceType":"android"}',
-    'x-ostad-device-id': 'UP1A.231005.007'
+  // আপনার দেওয়া অরিজিনাল হেডারগুলো (সব রিকোয়েস্টে এটাই ব্যবহার হবে)
+  const headersTemplate = {
+    "User-Agent": "Dart/3.9 (dart:io)",
+    "Connection": "keep-alive",
+    "Accept": "*/*",
+    "x-ostad-app-build": "907",
+    "x-ostad-app-version": "2.103.2",
+    "fingerprint": "c5a55c04-c5fc-42c0-b597-fce025355ebb",
+    "x-ostad-app": "com.ostad.android",
+    "content-type": "application/json",
+    "metadata": "{\"model\":\"P963F95_A\",\"brand\":\"ZTE\",\"version\":\"34\",\"display\":\"14.11_Z2453_SA\",\"deviceType\":\"android\"}",
+    "x-ostad-device-id": "UP1A.231005.007"
   };
 
   try {
+    // --- প্রথম রিকোয়েস্ট (লগিন করে টোকেন আনা) ---
+    const loginUrl = 'https://api.ostad.app/api/v2/user/login-msisdn'; 
     const loginRes = await fetch(loginUrl, {
       method: 'POST',
-      headers: defaultHeaders,
+      headers: headersTemplate,
       body: JSON.stringify({ msisdn: ms, password: ps })
     });
     
     const loginData = await loginRes.json();
     const token = loginData?.data?.accessToken; 
 
+    // লগিন ফেইল হলে বা টোকেন না পেলে
     if (!token) {
       return res.status(401).send(`
-        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-            <h2 style="color: red;">লগিন ব্যর্থ!</h2>
-            <p>সঠিক নাম্বার বা পাসওয়ার্ড দিন।</p>
+        <div style="font-family: sans-serif; text-align: center; padding: 50px; background: #ffebee;">
+            <h2 style="color: red;">লগিন ব্যর্থ! ❌</h2>
+            <p>আপনার দেওয়া নাম্বার বা পাসওয়ার্ড ভুল হতে পারে।</p>
         </div>
       `);
     }
 
-    // --- দ্বিতীয় রিকোয়েস্ট (আপনার দেওয়া ব্যাচ API) ---
+    // --- দ্বিতীয় রিকোয়েস্ট (টোকেন দিয়ে ব্যাচ ডাটা আনা) ---
     const secondUrl = 'https://api.ostad.app/api/v2/batch?count=12&page=1&is_on_demand=false';
-    
     const secondRes = await fetch(secondUrl, {
       method: 'GET',
       headers: {
-        ...defaultHeaders,
-        'accesstoken': token // প্রথম রিকোয়েস্ট থেকে পাওয়া টোকেন এখানে পাঠানো হচ্ছে
+        ...headersTemplate,
+        "accesstoken": token // আপনার দেওয়া ফরম্যাট অনুযায়ী সরাসরি টোকেন বসানো হলো
       }
     });
     
     const secondApiData = await secondRes.json();
 
-    // --- ব্রাউজারে শুধুমাত্র ব্যাচের রেসপন্স দেখানো ---
+    // --- ব্রাউজারে সুন্দর করে রেসপন্স দেখানো ---
     const htmlResponse = `
       <!DOCTYPE html>
       <html lang="en">
@@ -99,7 +103,7 @@ export default async function handler(req, res) {
       </head>
       <body>
           <div class="container">
-              <h3 class="header">Batch Data (Success!)</h3>
+              <h3 class="header">✅ Batch Data Fetched Successfully!</h3>
               <pre>${JSON.stringify(secondApiData, null, 4)}</pre>
           </div>
       </body>
@@ -112,4 +116,4 @@ export default async function handler(req, res) {
   } catch (error) {
     res.status(500).send(`<h2 style='color:red; text-align:center;'>সার্ভার এরর: ${error.message}</h2>`);
   }
-}
+                }
