@@ -1,4 +1,5 @@
 export default async function handler(req, res) {
+  // শুধুমাত্র GET রিকোয়েস্ট অ্যালাও করা
   if (req.method !== 'GET') {
     return res.status(405).json({ error: "Only GET method allowed" });
   }
@@ -6,7 +7,7 @@ export default async function handler(req, res) {
   const { ms, ps } = req.query;
 
   if (!ms || !ps) {
-    return res.status(400).send("<h2 style='color:red; text-align:center;'>ms এবং ps দেওয়া বাধ্যতামূলক!</h2>");
+    return res.status(400).json({ error: "ms এবং ps দেওয়া বাধ্যতামূলক!" });
   }
 
   const headersTemplate = {
@@ -35,12 +36,7 @@ export default async function handler(req, res) {
     const token = loginData?.data?.accessToken; 
 
     if (!token) {
-      return res.status(401).send(`
-        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-            <h2 style="color: red;">লগিন ব্যর্থ! ❌</h2>
-            <p>আপনার দেওয়া নাম্বার বা পাসওয়ার্ড ভুল হতে পারে।</p>
-        </div>
-      `);
+      return res.status(401).json({ error: "লগিন ব্যর্থ! সঠিক নাম্বার বা পাসওয়ার্ড দিন।" });
     }
 
     // --- ২. টোকেন দিয়ে ব্যাচ ডাটা আনা ---
@@ -55,104 +51,25 @@ export default async function handler(req, res) {
     
     const secondApiData = await secondRes.json();
 
-    // --- ৩. JSON থেকে নির্দিষ্ট ডাটা বের করা (Data Parsing) ---
-    // টোটাল কোর্সের সংখ্যা বের করছি
+    // --- ৩. ডাটা প্রসেসিং করে আপনার কাঙ্ক্ষিত ফরম্যাট তৈরি করা ---
     const totalCourses = secondApiData?.data?.total || 0;
-    
-    // কোর্সের লিস্ট বের করছি
     const courseResults = secondApiData?.data?.results || [];
+
+    // শুধু কোর্সের টাইটেলগুলো বের করে একটি লিস্ট তৈরি করা
+    const courseTitles = courseResults.map(course => course?.course_snapshot?.title || "Unknown Course");
+
+    // 'Total Courses: 3' এর সাথে টাইটেলগুলোকে ' | ' দিয়ে যুক্ত করা
+    const finalResultString = `Total Courses: ${totalCourses} | ` + courseTitles.join(' | ');
+
+    // --- ৪. রেসপন্স পাঠানো ---
     
-    // লুপ চালিয়ে HTML এর জন্য একটি লিস্ট (<li>) তৈরি করছি
-    let courseListHTML = '';
-    courseResults.forEach((course) => {
-      const title = course?.course_snapshot?.title || "Unknown Course";
-      courseListHTML += `<li class="course-item">${title}</li>`;
-    });
+    // আপনি যদি পিওর JSON ফরম্যাট চান:
+    res.status(200).json({ data: finalResultString });
 
-
-    // --- ৪. ব্রাউজারে সুন্দর করে রেসপন্স দেখানো ---
-    const htmlResponse = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>My Courses</title>
-          <style>
-              body {
-                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                  background-color: #f0f2f5;
-                  color: #333;
-                  display: flex;
-                  justify-content: center;
-                  align-items: center;
-                  min-height: 100vh;
-                  margin: 0;
-                  padding: 20px;
-              }
-              .container {
-                  background: white;
-                  padding: 30px;
-                  border-radius: 12px;
-                  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-                  width: 100%;
-                  max-width: 500px;
-              }
-              .header {
-                  color: #1a73e8;
-                  margin-top: 0;
-                  border-bottom: 2px solid #e8eaed;
-                  padding-bottom: 10px;
-                  text-align: center;
-              }
-              .total-box {
-                  background: #e8f0fe;
-                  color: #1967d2;
-                  padding: 10px 15px;
-                  border-radius: 8px;
-                  font-weight: bold;
-                  font-size: 18px;
-                  margin-bottom: 20px;
-                  display: inline-block;
-              }
-              ol.course-list {
-                  padding-left: 20px;
-                  margin: 0;
-              }
-              li.course-item {
-                  background: #f8f9fa;
-                  margin-bottom: 10px;
-                  padding: 12px 15px;
-                  border-radius: 6px;
-                  border-left: 4px solid #1a73e8;
-                  font-size: 16px;
-                  font-weight: 500;
-                  transition: transform 0.2s;
-              }
-              li.course-item:hover {
-                  transform: translateX(5px);
-                  background: #e1ebf9;
-              }
-          </style>
-      </head>
-      <body>
-          <div class="container">
-              <h2 class="header">📚 আপনার কোর্সসমূহ</h2>
-              
-              <div class="total-box">Total Courses: ${totalCourses}</div>
-              
-              <ol class="course-list">
-                  ${courseListHTML}
-              </ol>
-          </div>
-      </body>
-      </html>
-    `;
-
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.status(200).send(htmlResponse);
+    // (অথবা) আপনি যদি JSON বাদে একদম শুধু টেক্সট লাইনটিই দেখতে চান, তবে উপরের লাইনটি মুছে নিচের লাইনটি ব্যবহার করবেন:
+    // res.status(200).send(finalResultString);
 
   } catch (error) {
-    res.status(500).send(`<h2 style='color:red; text-align:center;'>সার্ভার এরর: ${error.message}</h2>`);
+    res.status(500).json({ error: `সার্ভার এরর: ${error.message}` });
   }
 }
