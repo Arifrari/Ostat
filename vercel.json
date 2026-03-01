@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/check/:ms/:ps",
-      "destination": "/api/login?ms=:ms&ps=:ps"
+      "source": "/check/:auth",
+      "destination": "/api/login?auth=:auth"
     }
   ]
 }
